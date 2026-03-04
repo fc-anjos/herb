@@ -6,6 +6,7 @@ const defaultSidebar = [
     collapsed: false,
     items: [
       { text: "Overview", link: "/overview" },
+      { text: "Configuration", link: "/configuration" },
       { text: "Projects", link: "/projects" },
     ],
   },
@@ -17,6 +18,7 @@ const defaultSidebar = [
       { text: "Formatter", link: "/projects/formatter" },
       { text: "Linter", link: "/projects/linter" },
       { text: "CLI", link: "/projects/cli" },
+      { text: "Dev Tools", link: "/projects/dev-tools" },
     ],
   },
   {
@@ -27,7 +29,17 @@ const defaultSidebar = [
       { text: "Highlighter", link: "/projects/highlighter" },
       { text: "Syntax Tree Printer", link: "/projects/printer" },
       { text: "Minifier", link: "/projects/minifier" },
+      { text: "Config", link: "/projects/config" },
+      { text: "Rewriter", link: "/projects/rewriter" },
       { text: "Core", link: "/projects/core" },
+    ],
+  },
+  {
+    text: "HTML+ERB Rendering",
+    collapsed: false,
+    items: [
+      { text: "Engine", link: "/projects/engine" },
+      { text: "Compiler", link: "/projects/compiler" },
     ],
   },
   {
@@ -78,6 +90,22 @@ const defaultSidebar = [
           { text: "Reference", link: "/bindings/javascript/reference" },
         ],
       },
+      {
+        text: "Java",
+        collapsed: false,
+        items: [
+          { text: "Installation", link: "/bindings/java/" },
+          { text: "Reference", link: "/bindings/java/reference" },
+        ],
+      },
+      {
+        text: "Rust",
+        collapsed: false,
+        items: [
+          { text: "Installation", link: "/bindings/rust/" },
+          { text: "Reference", link: "/bindings/rust/reference" },
+        ],
+      },
       { text: "WebAssembly", link: "/projects/webassembly" },
     ],
   },
@@ -104,6 +132,7 @@ export function createThemeConfig() {
     logo: "/herb.svg",
     nav: [
       { text: "Home", link: "/" },
+      { text: "Blog", link: "/blog/whats-new-in-herb-v0-8" },
       { text: "Documentation", link: "/overview" },
       { text: "Playground", link: "/playground" },
     ],
@@ -122,7 +151,19 @@ export function createThemeConfig() {
       copyright: "Copyright © 2024-2025 Marco Roth and the Herb Contributors.",
     },
     editLink: {
-      pattern: "https://github.com/marcoroth/herb/edit/main/docs/docs/:path",
+      pattern: ({ filePath }) => {
+        if (filePath.startsWith('linter/rules/')) {
+          let fileName = filePath.replace('linter/rules/', '')
+
+          if (fileName === 'index.md') {
+            fileName = 'README.md'
+          }
+
+          return `https://github.com/marcoroth/herb/edit/main/javascript/packages/linter/docs/rules/${fileName}`
+        }
+
+        return `https://github.com/marcoroth/herb/edit/main/docs/docs/${filePath}`
+      },
       text: "Edit this page on GitHub",
     },
     sidebar: {
@@ -144,6 +185,7 @@ export function createThemeConfig() {
         }
       ],
       '/projects/linter': linterSidebar,
+      '/blog': [],
       '/': defaultSidebar
     },
     socialLinks: [

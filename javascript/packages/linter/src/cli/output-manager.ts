@@ -1,5 +1,5 @@
 import { SummaryReporter } from "./summary-reporter.js"
-import { SimpleFormatter, DetailedFormatter, type JSONOutput } from "./formatters/index.js"
+import { SimpleFormatter, DetailedFormatter, GitHubActionsFormatter, type JSONOutput } from "./formatters/index.js"
 
 import type { ThemeInput } from "@herb-tools/highlighter"
 import type { FormatOption } from "./argument-parser.js"
@@ -11,6 +11,7 @@ interface OutputOptions {
   wrapLines: boolean
   truncateLines: boolean
   showTiming: boolean
+  useGitHubActions: boolean
   startTime: number
   startDate: Date
 }
@@ -26,9 +27,41 @@ export class OutputManager {
    * Output successful lint results
    */
   async outputResults(results: LintResults, options: OutputOptions): Promise<void> {
-    const { allOffenses, files, totalErrors, totalWarnings, filesWithOffenses, ruleCount, ruleOffenses } = results
+    const { allOffenses, files, totalErrors, totalWarnings, totalInfo, totalHints, totalIgnored, totalWouldBeIgnored, filesWithOffenses, ruleCount, ruleOffenses, context } = results
 
-    if (options.formatOption === "json") {
+    const autofixableCount = allOffenses.filter(offense => offense.autocorrectable).length
+
+    if (options.useGitHubActions) {
+      const githubFormatter = new GitHubActionsFormatter(options.wrapLines, options.truncateLines)
+      await githubFormatter.formatAnnotations(allOffenses)
+
+      if (options.formatOption !== "json") {
+        const regularFormatter = options.formatOption === "simple"
+          ? new SimpleFormatter()
+          : new DetailedFormatter(options.theme, options.wrapLines, options.truncateLines)
+
+        await regularFormatter.format(allOffenses, files.length === 1)
+
+        this.summaryReporter.displayMostViolatedRules(ruleOffenses)
+        this.summaryReporter.displaySummary({
+          files,
+          totalErrors,
+          totalWarnings,
+          totalInfo,
+          totalHints,
+          totalIgnored,
+          totalWouldBeIgnored,
+          filesWithOffenses,
+          ruleCount,
+          startTime: options.startTime,
+          startDate: options.startDate,
+          showTiming: options.showTiming,
+          ruleOffenses,
+          autofixableCount,
+          ignoreDisableComments: context?.ignoreDisableComments,
+        })
+      }
+    } else if (options.formatOption === "json") {
       const output: JSONOutput = {
         offenses: allOffenses.map(({ filename, offense }) => ({
           filename,
@@ -43,6 +76,9 @@ export class OutputManager {
           filesWithOffenses,
           totalErrors,
           totalWarnings,
+          totalInfo,
+          totalHints,
+          totalIgnored,
           totalOffenses: totalErrors + totalWarnings,
           ruleCount
         },
@@ -71,12 +107,18 @@ export class OutputManager {
         files,
         totalErrors,
         totalWarnings,
+        totalInfo,
+        totalHints,
+        totalIgnored,
+        totalWouldBeIgnored,
         filesWithOffenses,
         ruleCount,
         startTime: options.startTime,
         startDate: options.startDate,
         showTiming: options.showTiming,
-        ruleOffenses
+        ruleOffenses,
+        autofixableCount,
+        ignoreDisableComments: context?.ignoreDisableComments,
       })
     }
   }
@@ -85,7 +127,9 @@ export class OutputManager {
    * Output informational message (like "no files found")
    */
   outputInfo(message: string, options: OutputOptions): void {
-    if (options.formatOption === "json") {
+    if (options.useGitHubActions) {
+      // GitHub Actions format doesn't output anything for info messages
+    } else if (options.formatOption === "json") {
       const output: JSONOutput = {
         offenses: [],
         summary: {
@@ -93,6 +137,9 @@ export class OutputManager {
           filesWithOffenses: 0,
           totalErrors: 0,
           totalWarnings: 0,
+          totalInfo: 0,
+          totalHints: 0,
+          totalIgnored: 0,
           totalOffenses: 0,
           ruleCount: 0
         },
@@ -118,7 +165,9 @@ export class OutputManager {
    * Output error message
    */
   outputError(message: string, options: OutputOptions): void {
-    if (options.formatOption === "json") {
+    if (options.useGitHubActions) {
+      console.log(`::error::${message}`)
+    } else if (options.formatOption === "json") {
       const output: JSONOutput = {
         offenses: [],
         summary: null,

@@ -1,6 +1,8 @@
 import { colorize, Highlighter, type ThemeInput, DEFAULT_THEME } from "@herb-tools/highlighter"
 
 import { BaseFormatter } from "./base-formatter.js"
+import { LineWrapper } from "@herb-tools/highlighter"
+import { ruleDocumentationUrl, fileUrl } from "../../urls.js"
 
 import type { Diagnostic } from "@herb-tools/core"
 import type { ProcessedFile } from "../file-processor.js"
@@ -26,34 +28,46 @@ export class DetailedFormatter extends BaseFormatter {
       await this.highlighter.initialize()
     }
 
+    const correctableTag = colorize(colorize("[Correctable]", "green"), "bold")
+    const autocorrectableSet = new Set(
+      allOffenses.filter(item => item.autocorrectable).map(item => item.offense)
+    )
+
     if (isSingleFile) {
-      // For single file, use inline diagnostics with syntax highlighting
       const { filename, content } = allOffenses[0]
       const diagnostics = allOffenses.map(item => item.offense)
 
       const highlighted = this.highlighter.highlight(filename, content, {
         diagnostics: diagnostics,
-        splitDiagnostics: true, // Use split mode to show each diagnostic separately
+        splitDiagnostics: true,
         contextLines: 2,
         wrapLines: this.wrapLines,
-        truncateLines: this.truncateLines
+        truncateLines: this.truncateLines,
+        codeUrlBuilder: ruleDocumentationUrl,
+        fileUrlBuilder: (path) => fileUrl(path),
+        suffixBuilder: (diagnostic) => autocorrectableSet.has(diagnostic) ? correctableTag : undefined,
       })
 
       console.log(`\n${highlighted}`)
     } else {
-      // For multiple files, show individual diagnostics with syntax highlighting
       const totalMessageCount = allOffenses.length
 
       for (let i = 0; i < allOffenses.length; i++) {
-        const { filename, offense, content } = allOffenses[i]
-        const formatted = this.highlighter.highlightDiagnostic(filename, offense, content, { 
-          contextLines: 2, 
+        const { filename, offense, content, autocorrectable } = allOffenses[i]
+
+        const codeUrl = offense.code ? ruleDocumentationUrl(offense.code) : undefined
+        const suffix = autocorrectable ? correctableTag : undefined
+        const formatted = this.highlighter.highlightDiagnostic(filename, offense, content, {
+          contextLines: 2,
           wrapLines: this.wrapLines,
-          truncateLines: this.truncateLines
+          truncateLines: this.truncateLines,
+          codeUrl,
+          fileUrl: fileUrl(filename),
+          suffix,
         })
         console.log(`\n${formatted}`)
 
-        const width = process.stdout.columns || 80
+        const width = LineWrapper.getTerminalWidth()
         const progressText = `[${i + 1}/${totalMessageCount}]`
         const rightPadding = 16
         const separatorLength = Math.max(0, width - progressText.length - 1 - rightPadding)
@@ -68,7 +82,6 @@ export class DetailedFormatter extends BaseFormatter {
   }
 
   formatFile(_filename: string, _offenses: Diagnostic[]): void {
-    // Not used in detailed formatter
     throw new Error("formatFile is not implemented for DetailedFormatter")
   }
 }
